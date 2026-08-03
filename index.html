@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>V-Suivi</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="V-Suivi">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0a;
+      color: white;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ---- ANIMATION D'INTRO STYLE NETFLIX ---- */
+    #intro {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+    }
+    #intro .v-letter {
+      font-size: 120px;
+      font-weight: 800;
+      color: #ff3b30;
+      opacity: 0;
+      transform: scale(0.3);
+      animation: vAppear 1.8s ease-out forwards;
+      text-shadow: 0 0 40px rgba(255,59,48,0.6);
+    }
+    @keyframes vAppear {
+      0% { opacity: 0; transform: scale(0.3); }
+      40% { opacity: 1; transform: scale(1.15); }
+      60% { transform: scale(1); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    #intro.fade-out {
+      animation: fadeOutIntro 0.6s ease forwards;
+    }
+    @keyframes fadeOutIntro {
+      to { opacity: 0; visibility: hidden; }
+    }
+
+    /* ---- APP PRINCIPALE ---- */
+    #app {
+      background: #f2f2f7;
+      color: #000;
+      min-height: 100vh;
+      padding: env(safe-area-inset-top) 16px 16px 16px;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #app.visible { opacity: 1; }
+
+    h1 { font-size: 26px; padding: 20px 0 16px 0; }
+
+    .add-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #ff3b30;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: white;
+      padding: 16px;
+      border-radius: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card h3 { font-size: 17px; margin-bottom: 4px; }
+    .card p { font-size: 14px; color: #666; margin-bottom: 8px; }
+    .card .row { display: flex; gap: 8px; }
+    .card button {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .btn-reminder { background: #007aff; color: white; }
+    .btn-delete { background: #ffe5e3; color: #ff3b30; }
+
+    /* ---- MODAL FORMULAIRE ---- */
+    #modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: flex-end;
+      z-index: 100;
+    }
+    #modal.open { display: flex; }
+    #modal .sheet {
+      background: white;
+      color: #000;
+      width: 100%;
+      border-radius: 20px 20px 0 0;
+      padding: 20px;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+    #modal input, #modal textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 10px;
+    }
+    #modal .save-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #34c759;
+      color: white;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="intro">
+    <div class="v-letter">V</div>
+  </div>
+
+  <div id="app">
+    <h1>👥 Suivi Clients</h1>
+    <button class="add-btn" onclick="openModal()">+ Nouveau client</button>
+    <div id="clientList"></div>
+  </div>
+
+  <div id="modal">
+    <div class="sheet">
+      <input type="text" id="clientName" placeholder="Nom du client">
+      <textarea id="clientNote" placeholder="Ce qu'il fait / contexte" rows="2"></textarea>
+      <input type="date" id="reminderDate">
+      <button class="save-btn" onclick="saveClient()">Enregistrer</button>
+    </div>
+  </div>
+
+  <script>
+    let clients = JSON.parse(localStorage.getItem('clients') || '[]');
+
+    function render() {
+      const list = document.getElementById('clientList');
+      list.innerHTML = '';
+      clients.forEach((c, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <h3>${c.name}</h3>
+          <p>${c.note || 'Pas de note'}</p>
+          ${c.date ? `<p>📅 Rappel : ${c.date}</p>` : ''}
+          <div class="row">
+            ${c.date ? `<button class="btn-reminder" onclick="downloadICS(${i})">Ajouter au calendrier</button>` : ''}
+            <button class="btn-delete" onclick="deleteClient(${i})">Supprimer</button>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function openModal() {
+      document.getElementById('modal').classList.add('open');
+    }
+    function closeModal() {
+      document.getElementById('modal').classList.remove('open');
+      document.getElementById('clientName').value = '';
+      document.getElementById('clientNote').value = '';
+      document.getElementById('reminderDate').value = '';
+    }
+
+    function saveClient() {
+      const name = document.getElementById('clientName').value.trim();
+      if (!name) return;
+      clients.push({
+        name,
+        note: document.getElementById('clientNote').value.trim(),
+        date: document.getElementById('reminderDate').value
+      });
+      localStorage.setItem('clients', JSON.stringify(clients));
+      closeModal();
+      render();
+    }
+
+    function deleteClient(i) {
+      clients.splice(i, 1);
+      localStorage.setItem('clients', JSON.stringify(clients));
+      render();
+    }
+
+    // Génère un fichier .ics téléchargeable -> iOS propose "Ajouter à Calendrier"
+    function downloadICS(i) {
+      const c = clients[i];
+      const dateStr = c.date.replace(/-/g, '');
+      const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        `SUMMARY:Rappel - ${c.name}`,
+        `DESCRIPTION:${c.note}`,
+        `DTSTART;VALUE=DATE:${dateStr}`,
+        `DTEND;VALUE=DATE:${dateStr}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\n');
+      const blob = new Blob([ics], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rappel-${c.name}.ics`;
+      a.click();
+    }
+
+    render();
+
+    // Animation d'intro -> app
+    setTimeout(() => {
+      document.getElementById('intro').classList.add('fade-out');
+      document.getElementById('app').classList.add('visible');
+    }, 1800);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
+</body>
+</html>
